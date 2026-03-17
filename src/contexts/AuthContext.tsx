@@ -23,6 +23,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
       console.log('🔐 AUTH_STATE_CHANGE:', { event: _event, hasSession: !!session });
+
+      if (_event === 'TOKEN_REFRESHED') {
+        console.log('🔄 Token renovado correctamente');
+        if (session?.user) {
+          await loadUserProfile(session.user);
+        }
+        return;
+      }
+
+      if (_event === 'TOKEN_REFRESH_FAILED' || _event === 'SIGNED_OUT') {
+        console.warn('⚠️ Token refresh fallido o sesión cerrada. Limpiando sesión local...');
+        Object.keys(localStorage).forEach(key => {
+          if (key.startsWith('sb-')) localStorage.removeItem(key);
+        });
+        setUser(null);
+        lastProfileUserIdRef.current = null;
+        setAuthReady(true);
+        setLoading(false);
+        return;
+      }
+
       if (session?.user) {
         await loadUserProfile(session.user);
       } else {
@@ -42,7 +63,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const { data: { session }, error } = await supabase.auth.getSession();
       
       if (error) {
-        console.error('❌ SESSION_CHECK_ERROR:', error);
+        const isNetworkError = error.message?.toLowerCase().includes('fetch') ||
+          error.message?.toLowerCase().includes('network') ||
+          error.message?.toLowerCase().includes('failed');
+
+        if (isNetworkError) {
+          console.warn('⚠️ Error de red al verificar sesión. Limpiando sesión...');
+          // Limpiar tokens locales inválidos
+          Object.keys(localStorage).forEach(key => {
+            if (key.startsWith('sb-')) localStorage.removeItem(key);
+          });
+          await supabase.auth.signOut();
+        } else {
+          console.error('❌ SESSION_CHECK_ERROR:', error);
+        }
         setUser(null);
         setAuthReady(true);
         return;
@@ -56,8 +90,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(null);
         setAuthReady(true);
       }
-    } catch (error) {
-      console.error('❌ SESSION_CHECK_EXCEPTION:', error);
+    } catch (error: any) {
+      const isNetworkError = error?.message?.toLowerCase().includes('fetch') ||
+        error?.message?.toLowerCase().includes('failed to fetch');
+
+      if (isNetworkError) {
+        console.warn('⚠️ Error de red al iniciar sesión. Limpiando sesión local...');
+        Object.keys(localStorage).forEach(key => {
+          if (key.startsWith('sb-')) localStorage.removeItem(key);
+        });
+      } else {
+        console.error('❌ SESSION_CHECK_EXCEPTION:', error);
+      }
       setUser(null);
       setAuthReady(true);
     } finally {

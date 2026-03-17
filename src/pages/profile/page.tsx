@@ -34,95 +34,228 @@ export default function ProfilePage() {
     }
   };
 
+  const isAdmin = user?.role === 'admin';
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen" style={{ backgroundColor: '#f7f8fa' }}>
       <Navbar />
-      
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white rounded-2xl shadow-lg p-8 border border-gray-100">
-          <div className="flex items-center gap-4 mb-8">
-            <div className="w-20 h-20 bg-gradient-to-br from-teal-500 to-cyan-600 rounded-full flex items-center justify-center">
-              <span className="text-3xl font-bold text-white">
-                {user?.name?.charAt(0).toUpperCase()}
-              </span>
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Mi Perfil</h1>
-              <p className="text-gray-600 mt-1">Gestiona tu información personal</p>
-            </div>
-          </div>
 
-          {message && (
-            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-start gap-3">
-              <i className="ri-checkbox-circle-line text-green-500 text-xl"></i>
-              <p className="text-sm text-green-700 flex-1">{message}</p>
-            </div>
-          )}
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
 
-          {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
-              <i className="ri-error-warning-line text-red-500 text-xl"></i>
-              <p className="text-sm text-red-700 flex-1">{error}</p>
-            </div>
-          )}
+        {/* Page header */}
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold text-slate-800" style={{ fontFamily: "'Inter', sans-serif" }}>Mi Perfil</h1>
+          <p className="text-slate-500 text-sm mt-1">Administra tu información personal y configuración de cuenta</p>
+        </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-                Nombre completo
-              </label>
-              <input
-                id="name"
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all text-sm"
-                placeholder="Tu nombre"
-                required
-              />
-            </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                Correo electrónico
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                disabled
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed text-sm"
-              />
-              <p className="mt-2 text-xs text-gray-500">El correo electrónico no se puede cambiar</p>
-            </div>
+          {/* Left panel — user card */}
+          <div className="lg:col-span-1 flex flex-col gap-4">
 
-            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-700">Rol</p>
-                  <p className="text-sm text-gray-600 mt-1 capitalize">{user?.role}</p>
+            {/* Avatar & name card */}
+            <div className="bg-white rounded-2xl border border-slate-100 p-6 flex flex-col items-center text-center">
+              <div
+                className="w-24 h-24 rounded-2xl flex items-center justify-center mb-4 relative"
+                style={{ background: 'linear-gradient(135deg, #0d9488 0%, #06b6d4 100%)' }}
+              >
+                <span className="text-4xl font-bold text-white select-none">
+                  {user?.name?.charAt(0).toUpperCase()}
+                </span>
+                <div
+                  className="absolute -bottom-2 -right-2 w-7 h-7 rounded-full border-2 border-white flex items-center justify-center"
+                  style={{ background: isAdmin ? '#0d9488' : '#64748b' }}
+                >
+                  <i className={`${isAdmin ? 'ri-shield-star-fill' : 'ri-user-3-fill'} text-white text-xs`}></i>
                 </div>
-                <div className="w-10 h-10 bg-teal-100 rounded-lg flex items-center justify-center">
-                  <i className="ri-shield-user-line text-teal-600 text-xl"></i>
-                </div>
+              </div>
+
+              <h2 className="text-lg font-semibold text-slate-800 mt-2">{user?.name}</h2>
+              <p className="text-sm text-slate-400 mt-0.5 truncate w-full">{user?.email}</p>
+
+              <div
+                className="mt-4 px-4 py-1.5 rounded-full text-xs font-semibold"
+                style={{
+                  background: isAdmin ? 'rgba(13,148,136,0.1)' : 'rgba(100,116,139,0.1)',
+                  color: isAdmin ? '#0d9488' : '#64748b'
+                }}
+              >
+                {isAdmin ? 'Administrador' : 'Usuario'}
               </div>
             </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-gradient-to-r from-teal-500 to-cyan-600 text-white py-3 rounded-lg font-medium hover:from-teal-600 hover:to-cyan-700 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap cursor-pointer"
-            >
-              {loading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  Guardando...
-                </span>
-              ) : (
-                'Guardar Cambios'
+            {/* Info tiles */}
+            <div className="bg-white rounded-2xl border border-slate-100 p-5 space-y-4">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Información de cuenta</p>
+
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-xl bg-teal-50 flex items-center justify-center shrink-0">
+                  <i className="ri-mail-line text-teal-600 text-base"></i>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs text-slate-400">Correo electrónico</p>
+                  <p className="text-sm font-medium text-slate-700 truncate">{user?.email}</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-xl bg-teal-50 flex items-center justify-center shrink-0">
+                  <i className="ri-shield-user-line text-teal-600 text-base"></i>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400">Rol asignado</p>
+                  <p className="text-sm font-medium text-slate-700 capitalize">{isAdmin ? 'Administrador' : 'Usuario'}</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-xl bg-teal-50 flex items-center justify-center shrink-0">
+                  <i className="ri-user-line text-teal-600 text-base"></i>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400">Nombre de usuario</p>
+                  <p className="text-sm font-medium text-slate-700">{user?.name || '—'}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right panel — form */}
+          <div className="lg:col-span-2">
+            <div className="bg-white rounded-2xl border border-slate-100 p-8">
+
+              <div className="mb-6 pb-5 border-b border-slate-100">
+                <h3 className="text-base font-semibold text-slate-800">Editar información</h3>
+                <p className="text-sm text-slate-400 mt-1">Actualiza los datos que se mostrarán en tu cuenta</p>
+              </div>
+
+              {message && (
+                <div className="mb-6 p-4 rounded-xl flex items-center gap-3" style={{ background: 'rgba(13,148,136,0.07)', border: '1px solid rgba(13,148,136,0.2)' }}>
+                  <div className="w-8 h-8 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
+                    <i className="ri-checkbox-circle-line text-teal-600 text-base"></i>
+                  </div>
+                  <p className="text-sm text-teal-700 font-medium">{message}</p>
+                </div>
               )}
-            </button>
-          </form>
+
+              {error && (
+                <div className="mb-6 p-4 rounded-xl flex items-center gap-3" style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.18)' }}>
+                  <div className="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center shrink-0">
+                    <i className="ri-error-warning-line text-red-500 text-base"></i>
+                  </div>
+                  <p className="text-sm text-red-600 font-medium">{error}</p>
+                </div>
+              )}
+
+              <form onSubmit={handleSubmit} className="space-y-6">
+
+                <div>
+                  <label htmlFor="name" className="block text-sm font-medium text-slate-700 mb-2">
+                    Nombre completo
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                      <i className="ri-user-line text-slate-400 text-base"></i>
+                    </div>
+                    <input
+                      id="name"
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-400 focus:border-transparent transition-all text-sm text-slate-800 bg-slate-50/50"
+                      placeholder="Tu nombre completo"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-2">
+                    Correo electrónico
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                      <i className="ri-mail-line text-slate-300 text-base"></i>
+                    </div>
+                    <input
+                      id="email"
+                      type="email"
+                      value={email}
+                      disabled
+                      className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-xl text-slate-400 bg-slate-50 cursor-not-allowed text-sm"
+                    />
+                    <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
+                      <i className="ri-lock-2-line text-slate-300 text-sm"></i>
+                    </div>
+                  </div>
+                  <p className="mt-2 text-xs text-slate-400 flex items-center gap-1">
+                    <i className="ri-information-line text-xs"></i>
+                    El correo electrónico no puede ser modificado
+                  </p>
+                </div>
+
+                {/* Role display (read-only) */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Rol</label>
+                  <div
+                    className="flex items-center gap-3 px-4 py-3 rounded-xl border border-slate-200 bg-slate-50"
+                  >
+                    <div
+                      className="w-8 h-8 rounded-lg flex items-center justify-center"
+                      style={{ background: isAdmin ? 'rgba(13,148,136,0.1)' : 'rgba(100,116,139,0.1)' }}
+                    >
+                      <i
+                        className={`${isAdmin ? 'ri-shield-star-line' : 'ri-user-3-line'} text-base`}
+                        style={{ color: isAdmin ? '#0d9488' : '#64748b' }}
+                      ></i>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-slate-700">{isAdmin ? 'Administrador' : 'Usuario'}</p>
+                      <p className="text-xs text-slate-400">{isAdmin ? 'Acceso total al sistema' : 'Acceso de solo lectura'}</p>
+                    </div>
+                    <div className="ml-auto">
+                      <span
+                        className="text-xs font-semibold px-2.5 py-1 rounded-full"
+                        style={{
+                          background: isAdmin ? 'rgba(13,148,136,0.1)' : 'rgba(100,116,139,0.1)',
+                          color: isAdmin ? '#0d9488' : '#64748b'
+                        }}
+                      >
+                        {isAdmin ? 'Admin' : 'User'}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="mt-2 text-xs text-slate-400 flex items-center gap-1">
+                    <i className="ri-information-line text-xs"></i>
+                    El rol es asignado por el administrador del sistema
+                  </p>
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full py-3 rounded-xl font-semibold text-sm text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer whitespace-nowrap"
+                    style={{ background: 'linear-gradient(135deg, #0d9488 0%, #06b6d4 100%)' }}
+                  >
+                    {loading ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Guardando cambios...
+                      </span>
+                    ) : (
+                      <span className="flex items-center justify-center gap-2">
+                        <i className="ri-save-line text-base"></i>
+                        Guardar Cambios
+                      </span>
+                    )}
+                  </button>
+                </div>
+
+              </form>
+            </div>
+          </div>
+
         </div>
       </main>
     </div>

@@ -18,7 +18,7 @@ export default function CreateAppModal({ onClose, onSubmit }: CreateAppModalProp
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newCategoryColor, setNewCategoryColor] = useState('#14B8A6');
   const [uploading, setUploading] = useState(false);
-  const [errors, setErrors] = useState<{ name?: string; logo?: string; url?: string }>({});
+  const [errors, setErrors] = useState<{ name?: string; url?: string }>({});
 
   const colorOptions = [
     { value: '#14B8A6', label: 'Turquesa' },
@@ -50,17 +50,17 @@ export default function CreateAppModal({ onClose, onSubmit }: CreateAppModalProp
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 2 * 1024 * 1024) {
-        setErrors({ ...errors, logo: 'El archivo debe ser menor a 2MB' });
+        setErrors({ ...errors });
         return;
       }
 
       if (!file.type.startsWith('image/')) {
-        setErrors({ ...errors, logo: 'Solo se permiten imágenes' });
+        setErrors({ ...errors });
         return;
       }
 
       setLogoFile(file);
-      setErrors({ ...errors, logo: undefined });
+      setErrors({ ...errors });
       
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -73,27 +73,33 @@ export default function CreateAppModal({ onClose, onSubmit }: CreateAppModalProp
   const uploadLogo = async (): Promise<string> => {
     if (!logoFile) throw new Error('No hay archivo para subir');
 
-    const fileExt = logoFile.name.split('.').pop();
-    const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
-    const filePath = `logos/${fileName}`;
+    // Intentar subir a Storage primero
+    try {
+      const fileExt = logoFile.name.split('.').pop();
+      const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
+      const filePath = `logos/${fileName}`;
 
-    const { error: uploadError } = await supabase.storage
-      .from('app-logos')
-      .upload(filePath, logoFile, {
-        cacheControl: '3600',
-        upsert: false
-      });
+      const { error: uploadError } = await supabase.storage
+        .from('app-logos')
+        .upload(filePath, logoFile, { cacheControl: '3600', upsert: false });
 
-    if (uploadError) {
-      console.error('Error al subir archivo:', uploadError);
-      throw new Error(`Error al subir el logo: ${uploadError.message}`);
+      if (!uploadError) {
+        const { data } = supabase.storage.from('app-logos').getPublicUrl(filePath);
+        return data.publicUrl;
+      }
+
+      console.warn('Storage no disponible, usando base64:', uploadError.message);
+    } catch (e) {
+      console.warn('Error en Storage, usando base64:', e);
     }
 
-    const { data } = supabase.storage
-      .from('app-logos')
-      .getPublicUrl(filePath);
-
-    return data.publicUrl;
+    // Fallback: guardar como base64
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error('Error al leer el archivo'));
+      reader.readAsDataURL(logoFile);
+    });
   };
 
   const handleCreateCategory = async () => {
@@ -120,14 +126,10 @@ export default function CreateAppModal({ onClose, onSubmit }: CreateAppModalProp
   };
 
   const validateForm = () => {
-    const newErrors: { name?: string; logo?: string; url?: string } = {};
+    const newErrors: { name?: string; url?: string } = {};
 
     if (!name.trim()) {
       newErrors.name = 'El nombre es requerido';
-    }
-
-    if (!logoFile && !logoPreview) {
-      newErrors.logo = 'El logo es requerido';
     }
 
     if (!url.trim()) {
@@ -147,7 +149,10 @@ export default function CreateAppModal({ onClose, onSubmit }: CreateAppModalProp
 
     try {
       setUploading(true);
-      const logoUrl = await uploadLogo();
+      let logoUrl = '';
+      if (logoFile) {
+        logoUrl = await uploadLogo();
+      }
       
       await onSubmit({ 
         name, 
@@ -156,12 +161,10 @@ export default function CreateAppModal({ onClose, onSubmit }: CreateAppModalProp
         category_id: categoryId || undefined,
       });
       
-      // Cerrar modal después de crear exitosamente
       onClose();
     } catch (error: any) {
       console.error('Error completo:', error);
-      setErrors({ ...errors, logo: error.message || 'Error al crear la aplicación' });
-      alert(`Error: ${error.message || 'No se pudo crear la aplicación. Verifica que el bucket "app-logos" existe en Supabase Storage.'}`);
+      setErrors({ ...errors });
     } finally {
       setUploading(false);
     }
@@ -198,7 +201,7 @@ export default function CreateAppModal({ onClose, onSubmit }: CreateAppModalProp
 
           <div>
             <label htmlFor="logo" className="block text-sm font-medium text-slate-700 mb-2">
-              Logo de la aplicación *
+              Logo de la aplicación
             </label>
             <div className="space-y-3">
               <div className="flex items-center gap-3">
@@ -214,7 +217,7 @@ export default function CreateAppModal({ onClose, onSubmit }: CreateAppModalProp
                   />
                 </label>
               </div>
-              {errors.logo && <p className="text-xs text-red-600">{errors.logo}</p>}
+
               {logoPreview && (
                 <div className="p-3 bg-slate-50 rounded-lg">
                   <p className="text-xs text-slate-600 mb-2">Vista previa:</p>

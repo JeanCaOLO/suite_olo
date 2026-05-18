@@ -3,6 +3,7 @@ import NotFound from "../pages/NotFound";
 import Login from "../pages/login/page";
 import Dashboard from "../pages/dashboard/page";
 import Profile from "../pages/profile/page";
+import Security from "../pages/security/page";
 
 const routes: RouteObject[] = [
   {
@@ -20,6 +21,10 @@ const routes: RouteObject[] = [
   {
     path: "/profile",
     element: <Profile />,
+  },
+  {
+    path: "/security",
+    element: <Security />,
   },
   {
     path: "*",

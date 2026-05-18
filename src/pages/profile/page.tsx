@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import Navbar from '../dashboard/components/Navbar';
+import AppLayout from '@/components/feature/AppLayout';
 import { supabase } from '../../lib/supabase';
 
 export default function ProfilePage() {
@@ -37,10 +37,8 @@ export default function ProfilePage() {
   const isAdmin = user?.role === 'admin';
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#f7f8fa' }}>
-      <Navbar />
-
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+    <AppLayout>
+      <main className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-10">
 
         {/* Page header */}
         <div className="mb-8">
@@ -258,6 +256,6 @@ export default function ProfilePage() {
 
         </div>
       </main>
-    </div>
+    </AppLayout>
   );
 }

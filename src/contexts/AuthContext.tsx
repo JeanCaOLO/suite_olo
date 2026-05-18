@@ -13,6 +13,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Refs para evitar cargas duplicadas
   const isLoadingProfileRef = useRef(false);
   const lastProfileUserIdRef = useRef<string | null>(null);
+  // Ref para saber si el perfil ya fue cargado exitosamente (evita stale closure)
+  const userLoadedRef = useRef(false);
 
   useEffect(() => {
     // Verificar sesión inicial
@@ -26,9 +28,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (_event === 'TOKEN_REFRESHED') {
         console.log('🔄 Token renovado correctamente');
-        if (session?.user) {
+        // Solo recargamos si el perfil NO estaba previamente cargado
+        // Evita sobreescribir el rol cuando el token se renueva automáticamente
+        if (session?.user && !userLoadedRef.current) {
           await loadUserProfile(session.user);
         }
+        return;
+      }
+
+      // Si ya tenemos el perfil cargado para este usuario, no recargar en ningún evento
+      if (
+        session?.user &&
+        userLoadedRef.current &&
+        lastProfileUserIdRef.current === session.user.id
+      ) {
+        console.log('⏭️ AUTH_STATE_CHANGE_SKIPPED: Perfil ya cargado, ignorando evento', _event);
         return;
       }
 
@@ -117,7 +131,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    if (lastProfileUserIdRef.current === supabaseUser.id && user !== null && !isRetry) {
+    // Usamos userLoadedRef en vez de "user !== null" para evitar stale closure
+    // (el estado user puede ser null en el closure aunque ya fue seteado)
+    if (lastProfileUserIdRef.current === supabaseUser.id && userLoadedRef.current && !isRetry) {
       console.log('⏭️ PROFILE_LOAD_SKIPPED_ALREADY_LOADED:', { userId: supabaseUser.id });
       setAuthReady(true);
       setLoading(false);
@@ -129,9 +145,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       console.log('👤 PROFILE_LOAD_START:', { userId: supabaseUser.id, isRetry });
       
-      // Crear timeout de 8 segundos para la consulta
+      // Crear timeout de 15 segundos para la consulta (RLS puede ser lento)
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('TIMEOUT')), 8000);
+        setTimeout(() => reject(new Error('TIMEOUT')), 15000);
       });
 
       console.log('🔍 PROFILE_QUERY_START: Iniciando consulta a Supabase');
@@ -175,6 +191,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           console.log('✅ PROFILE_LOAD_SUCCESS: Perfil creado y cargado');
           setUser(newProfile);
           lastProfileUserIdRef.current = supabaseUser.id;
+          userLoadedRef.current = true;
           setAuthReady(true);
         } else {
           console.error('❌ PROFILE_CREATE_ERROR:', insertError);
@@ -200,6 +217,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           role: profile.role as 'admin' | 'user',
         });
         lastProfileUserIdRef.current = supabaseUser.id;
+        userLoadedRef.current = true;
         setAuthReady(true);
       } else if (error) {
         console.error('❌ PROFILE_LOAD_ERROR:', { 
@@ -223,17 +241,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           await loadUserProfile(supabaseUser, true);
           return;
         } else {
-          console.warn('⚠️ PROFILE_LOAD_DEGRADED: Timeout después de retry, continuando con perfil por defecto');
-          
-          // Continuar con perfil por defecto después del retry fallido
-          const defaultProfile = {
-            id: supabaseUser.id,
-            email: supabaseUser.email || '',
-            name: supabaseUser.user_metadata?.name || supabaseUser.email?.split('@')[0] || 'Usuario',
-            role: 'user' as const,
-          };
-          setUser(defaultProfile);
-          lastProfileUserIdRef.current = supabaseUser.id;
+          console.warn('⚠️ PROFILE_LOAD_DEGRADED: Timeout después de retry. Protegiendo rol existente.');
+          // NUNCA asignar role: 'user' como fallback — eso pisaría el rol del admin
+          // Si userLoadedRef es true, el perfil ya está en memoria → no tocar nada
+          // Si no, marcar listo sin usuario (obligará a re-login)
+          if (!userLoadedRef.current) {
+            setUser(null);
+          }
+          // NO actualizamos lastProfileUserIdRef para que el próximo evento reintente
           setAuthReady(true);
         }
       } else {
@@ -299,6 +314,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await supabase.auth.signOut();
     setUser(null);
     lastProfileUserIdRef.current = null;
+    userLoadedRef.current = false;
     setAuthReady(true);
     console.log('✅ LOGOUT_SUCCESS');
   };

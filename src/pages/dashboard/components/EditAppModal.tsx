@@ -18,8 +18,9 @@ export default function EditAppModal({ app, onClose, onUpdate }: EditAppModalPro
   const [showNewCategory, setShowNewCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newCategoryColor, setNewCategoryColor] = useState('#14B8A6');
+  const [logoRemoved, setLogoRemoved] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [errors, setErrors] = useState<{ name?: string; logo?: string; url?: string }>({});
+  const [errors, setErrors] = useState<{ name?: string; url?: string }>({});
 
   const colorOptions = [
     { value: '#14B8A6', label: 'Turquesa' },
@@ -71,24 +72,43 @@ export default function EditAppModal({ app, onClose, onUpdate }: EditAppModalPro
     }
   };
 
+  const handleRemoveLogo = () => {
+    setLogoFile(null);
+    setLogoPreview('');
+    setLogoRemoved(true);
+  };
+
   const uploadLogo = async (): Promise<string> => {
+    if (logoRemoved) return '';
     if (!logoFile) return logoPreview;
 
-    const fileExt = logoFile.name.split('.').pop();
-    const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
-    const filePath = `logos/${fileName}`;
+    // Intentar subir a Storage primero
+    try {
+      const fileExt = logoFile.name.split('.').pop();
+      const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
+      const filePath = `logos/${fileName}`;
 
-    const { error: uploadError } = await supabase.storage
-      .from('app-logos')
-      .upload(filePath, logoFile);
+      const { error: uploadError } = await supabase.storage
+        .from('app-logos')
+        .upload(filePath, logoFile);
 
-    if (uploadError) throw uploadError;
+      if (!uploadError) {
+        const { data } = supabase.storage.from('app-logos').getPublicUrl(filePath);
+        return data.publicUrl;
+      }
 
-    const { data } = supabase.storage
-      .from('app-logos')
-      .getPublicUrl(filePath);
+      console.warn('Storage no disponible, usando base64:', uploadError.message);
+    } catch (e) {
+      console.warn('Error en Storage, usando base64:', e);
+    }
 
-    return data.publicUrl;
+    // Fallback: guardar como base64
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error('Error al leer el archivo'));
+      reader.readAsDataURL(logoFile);
+    });
   };
 
   const handleCreateCategory = async () => {
@@ -115,7 +135,7 @@ export default function EditAppModal({ app, onClose, onUpdate }: EditAppModalPro
   };
 
   const validateForm = () => {
-    const newErrors: { name?: string; logo?: string; url?: string } = {};
+    const newErrors: { name?: string; url?: string } = {};
 
     if (!name.trim()) {
       newErrors.name = 'El nombre es requerido';
@@ -209,10 +229,37 @@ export default function EditAppModal({ app, onClose, onUpdate }: EditAppModalPro
               Logo de la aplicación
             </label>
             <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <label className="flex-1 px-4 py-3 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors duration-200 cursor-pointer text-sm text-slate-700 flex items-center justify-center gap-2">
+              {logoPreview ? (
+                <div className="p-3 bg-slate-50 rounded-lg flex items-center gap-4">
+                  <div className="w-16 h-16 bg-white rounded-lg flex items-center justify-center border border-slate-200 shrink-0">
+                    <img src={logoPreview} alt="Preview" className="w-12 h-12 object-contain" />
+                  </div>
+                  <div className="flex flex-col gap-2 flex-1">
+                    <label className="px-3 py-2 border border-slate-300 rounded-lg hover:bg-white transition-colors duration-200 cursor-pointer text-xs text-slate-600 flex items-center justify-center gap-1.5">
+                      <i className="ri-refresh-line w-4 h-4 flex items-center justify-center"></i>
+                      <span>{logoFile ? logoFile.name : 'Cambiar imagen'}</span>
+                      <input
+                        id="logo"
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileChange}
+                        className="hidden"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleRemoveLogo}
+                      className="px-3 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors duration-200 cursor-pointer text-xs flex items-center justify-center gap-1.5 whitespace-nowrap"
+                    >
+                      <i className="ri-delete-bin-line w-4 h-4 flex items-center justify-center"></i>
+                      Quitar imagen
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <label className="w-full px-4 py-3 border border-dashed border-slate-300 rounded-lg hover:bg-slate-50 transition-colors duration-200 cursor-pointer text-sm text-slate-500 flex items-center justify-center gap-2">
                   <i className="ri-upload-cloud-line text-lg w-5 h-5 flex items-center justify-center"></i>
-                  <span>{logoFile ? logoFile.name : 'Cambiar imagen'}</span>
+                  <span>{logoFile ? logoFile.name : 'Subir imagen (opcional)'}</span>
                   <input
                     id="logo"
                     type="file"
@@ -221,15 +268,6 @@ export default function EditAppModal({ app, onClose, onUpdate }: EditAppModalPro
                     className="hidden"
                   />
                 </label>
-              </div>
-              {errors.logo && <p className="text-xs text-red-600">{errors.logo}</p>}
-              {logoPreview && (
-                <div className="p-3 bg-slate-50 rounded-lg">
-                  <p className="text-xs text-slate-600 mb-2">Vista previa:</p>
-                  <div className="w-20 h-20 bg-white rounded-lg flex items-center justify-center border border-slate-200">
-                    <img src={logoPreview} alt="Preview" className="w-16 h-16 object-contain" />
-                  </div>
-                </div>
               )}
               <p className="text-xs text-slate-500">Tamaño máximo: 2MB. Formatos: JPG, PNG, SVG</p>
             </div>

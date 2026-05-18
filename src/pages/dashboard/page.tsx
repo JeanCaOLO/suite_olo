@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import Navbar from './components/Navbar';
+import AppLayout from '@/components/feature/AppLayout';
 import AppGrid from './components/AppGrid';
 import CreateAppModal from './components/CreateAppModal';
 import EditAppModal from './components/EditAppModal';
@@ -18,6 +18,7 @@ export default function DashboardPage() {
   const [editingApp, setEditingApp] = useState<AppBox | null>(null);
   const [showManageCategories, setShowManageCategories] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [allowedAppIds, setAllowedAppIds] = useState<Set<string> | null>(null); // null = acceso total
 
   const isAdmin = user?.role === 'admin';
 
@@ -27,8 +28,31 @@ export default function DashboardPage() {
 
   const loadData = async () => {
     setLoading(true);
-    await Promise.all([loadApps(), loadCategories()]);
+    await Promise.all([loadApps(), loadCategories(), loadUserPermissions()]);
     setLoading(false);
+  };
+
+  const loadUserPermissions = async () => {
+    if (!user || isAdmin) {
+      setAllowedAppIds(null); // Admins ven todo
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('user_app_permissions')
+      .select('app_id')
+      .eq('user_id', user.id);
+
+    if (error || !data) {
+      setAllowedAppIds(null); // Error = acceso total por defecto
+      return;
+    }
+
+    if (data.length === 0) {
+      setAllowedAppIds(null); // Sin permisos guardados = acceso total
+    } else {
+      setAllowedAppIds(new Set(data.map(p => p.app_id)));
+    }
   };
 
   const loadApps = async () => {
@@ -144,22 +168,29 @@ export default function DashboardPage() {
   };
 
   const filteredApps = apps
+    .filter(app => allowedAppIds === null || allowedAppIds.has(app.id))
     .filter(app => selectedCategory === 'all' || app.category_id === selectedCategory)
     .filter(app => app.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
+  // Solo mostrar categorías que tienen apps permitidas
+  const visibleCategories = isAdmin
+    ? categories
+    : categories.filter(cat => {
+        const catApps = apps.filter(a => a.category_id === cat.id);
+        return catApps.some(a => allowedAppIds === null || allowedAppIds.has(a.id));
+      });
+
   return (
-    <div className="min-h-screen bg-slate-50">
-      <Navbar />
-      
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <AppLayout>
+      <main className="flex-1 px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-slate-800">
+            <h1 className="text-2xl font-bold text-slate-800">
               {isAdmin ? 'Mis Aplicaciones' : 'Aplicaciones Disponibles'}
             </h1>
-            <p className="text-slate-600 mt-1">
-              {isAdmin 
-                ? 'Gestiona todas tus aplicaciones en un solo lugar' 
+            <p className="text-slate-500 text-sm mt-1">
+              {isAdmin
+                ? 'Gestiona todas tus aplicaciones en un solo lugar'
                 : 'Explora todas las aplicaciones disponibles'}
             </p>
           </div>
@@ -167,14 +198,14 @@ export default function DashboardPage() {
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setShowManageCategories(true)}
-                className="px-5 py-3 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg transition-colors duration-200 flex items-center gap-2 cursor-pointer whitespace-nowrap"
+                className="px-4 py-2.5 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-lg transition-colors duration-200 flex items-center gap-2 cursor-pointer whitespace-nowrap text-sm"
               >
                 <i className="ri-folder-settings-line text-lg w-5 h-5 flex items-center justify-center"></i>
                 Categorías
               </button>
               <button
                 onClick={() => setShowCreateModal(true)}
-                className="px-6 py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-lg transition-colors duration-200 flex items-center gap-2 cursor-pointer whitespace-nowrap"
+                className="px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg transition-colors duration-200 flex items-center gap-2 cursor-pointer whitespace-nowrap text-sm"
               >
                 <i className="ri-add-line text-lg w-5 h-5 flex items-center justify-center"></i>
                 Nueva Aplicación
@@ -191,65 +222,70 @@ export default function DashboardPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Buscar aplicaciones..."
-              className="w-full pl-12 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none text-sm bg-white"
+              className="w-full pl-12 pr-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none text-sm bg-white"
             />
           </div>
 
-          {categories.length > 0 && (
+          {visibleCategories.length > 0 && (
             <div className="flex items-center gap-2 flex-wrap">
               <button
                 onClick={() => setSelectedCategory('all')}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 cursor-pointer whitespace-nowrap ${
+                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200 cursor-pointer whitespace-nowrap ${
                   selectedCategory === 'all'
                     ? 'bg-teal-600 text-white'
                     : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
                 }`}
               >
-                Todas ({apps.length})
+                Todas ({filteredApps.length})
               </button>
-              {categories.map((category) => (
-                <button
-                  key={category.id}
-                  onClick={() => setSelectedCategory(category.id)}
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 cursor-pointer whitespace-nowrap ${
-                    selectedCategory === category.id
-                      ? 'text-white'
-                      : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
-                  }`}
-                  style={{
-                    backgroundColor: selectedCategory === category.id ? category.color : undefined,
-                  }}
-                >
-                  {category.name} ({apps.filter(app => app.category_id === category.id).length})
-                </button>
-              ))}
+              {visibleCategories.map((category) => {
+                const count = apps
+                  .filter(app => app.category_id === category.id)
+                  .filter(app => allowedAppIds === null || allowedAppIds.has(app.id)).length;
+                return (
+                  <button
+                    key={category.id}
+                    onClick={() => setSelectedCategory(category.id)}
+                    className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200 cursor-pointer whitespace-nowrap ${
+                      selectedCategory === category.id
+                        ? 'text-white'
+                        : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+                    }`}
+                    style={{
+                      backgroundColor: selectedCategory === category.id ? category.color : undefined,
+                    }}
+                  >
+                    {category.name} ({count})
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
 
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <div className="w-12 h-12 border-4 border-teal-600 border-t-transparent rounded-full animate-spin"></div>
+            <div className="w-10 h-10 border-4 border-teal-600 border-t-transparent rounded-full animate-spin"></div>
           </div>
         ) : filteredApps.length === 0 ? (
           <div className="text-center py-20">
-            <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <i className="ri-apps-line text-4xl text-slate-400 w-10 h-10 flex items-center justify-center"></i>
             </div>
-            <h3 className="text-xl font-semibold text-slate-800 mb-2">
+            <h3 className="text-lg font-semibold text-slate-800 mb-2">
               {searchQuery ? 'No se encontraron aplicaciones' : selectedCategory === 'all' ? 'No hay aplicaciones' : 'No hay aplicaciones en esta categoría'}
             </h3>
-            <p className="text-slate-600 mb-6">
-              {searchQuery 
+            <p className="text-slate-500 text-sm mb-6">
+              {searchQuery
                 ? 'Intenta con otro término de búsqueda'
-                : selectedCategory === 'all' 
+                : selectedCategory === 'all'
                   ? isAdmin ? 'Comienza creando tu primera aplicación' : 'Aún no hay aplicaciones disponibles'
                   : 'No hay aplicaciones en esta categoría'}
             </p>
             {!searchQuery && isAdmin && (
               <button
                 onClick={() => setShowCreateModal(true)}
-                className="px-6 py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-lg transition-colors duration-200 inline-flex items-center gap-2 cursor-pointer whitespace-nowrap"
+                className="px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg transition-colors duration-200 inline-flex items-center gap-2 cursor-pointer whitespace-nowrap text-sm"
               >
                 <i className="ri-add-line text-lg w-5 h-5 flex items-center justify-center"></i>
                 Crear Primera Aplicación
@@ -257,10 +293,10 @@ export default function DashboardPage() {
             )}
           </div>
         ) : (
-          <AppGrid 
-            apps={filteredApps} 
-            onDelete={isAdmin ? handleDeleteApp : undefined} 
-            onEdit={isAdmin ? setEditingApp : undefined} 
+          <AppGrid
+            apps={filteredApps}
+            onDelete={isAdmin ? handleDeleteApp : undefined}
+            onEdit={isAdmin ? setEditingApp : undefined}
           />
         )}
       </main>
@@ -286,6 +322,6 @@ export default function DashboardPage() {
           onUpdate={loadData}
         />
       )}
-    </div>
+    </AppLayout>
   );
 }

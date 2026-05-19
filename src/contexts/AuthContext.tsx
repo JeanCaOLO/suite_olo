@@ -3,6 +3,11 @@ import { supabase } from '../lib/supabase';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 import type { AuthContextType, User } from '../types';
 
+const BASE = typeof __BASE_PATH__ !== 'undefined' ? __BASE_PATH__ : '';
+const basePath = BASE.split('/').filter(Boolean).join('/');
+const pathPrefix = basePath ? `/${basePath}` : '';
+const GOOGLE_REDIRECT_URL = `${window.location.origin}${pathPrefix}/`;
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -309,6 +314,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return data;
   };
 
+  const loginWithGoogle = async () => {
+    console.log('🔐 GOOGLE_LOGIN_ATTEMPT');
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: GOOGLE_REDIRECT_URL,
+      },
+    });
+    if (error) {
+      console.error('❌ GOOGLE_LOGIN_ERROR:', error);
+      throw new Error(error.message);
+    }
+  };
+
   const logout = async () => {
     console.log('🚪 LOGOUT_ATTEMPT');
     await supabase.auth.signOut();
@@ -338,6 +357,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         login,
         signup,
         logout,
+        loginWithGoogle,
         isAuthenticated: !!user,
       }}
     >
